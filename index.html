@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sys.stdout = io.StringIO()
       `);
       
-      // Run the user's code
+      // Run the user's code asynchronously
       await pyodide.runPythonAsync(code);
       
       // Get the captured output
@@ -178,49 +178,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Example script for a simple task
+  // Example script with async loop instead of while True
   editor.setValue(`
-# Todo List Manager
+import asyncio
 
-todos = []
+async def example_async_loop():
+    counter = 0
+    while counter < 5:
+        print(f"Running loop {counter + 1}")
+        await asyncio.sleep(1)  # Avoid blocking the main thread
+        counter += 1
 
-def add_task(task):
-    todos.append(task)
-    print(f"Task '{task}' added to the list.")
+# Run the async loop
+await example_async_loop()
 
-def remove_task(task):
-    if task in todos:
-        todos.remove(task)
-        print(f"Task '{task}' removed from the list.")
-    else:
-        print(f"Task '{task}' not found in the list.")
-
-def display_tasks():
-    if todos:
-        print("Your Todo List:")
-        for index, task in enumerate(todos, start=1):
-            print(f"{index}. {task}")
-    else:
-        print("Your todo list is empty.")
-
-# Example usage
-add_task("Buy groceries")
-add_task("Finish homework")
-add_task("Call mom")
-
-display_tasks()
-
-remove_task("Finish homework")
-
-display_tasks()
-
-# This script demonstrates:
-# 1. Function definitions and calls
-# 2. List operations (append, remove)
-# 3. Conditional statements (if-else)
-# 4. Loops (for)
-# 5. String formatting
-# 6. Enumeration
+print("Loop completed!")
 
 # Click the "Run Code" button to execute this script!
   `.trim());
