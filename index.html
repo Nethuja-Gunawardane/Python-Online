@@ -1,0 +1,229 @@
+<html>
+<head>
+<title>Online Python Editor and Interpreter</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #282a36;
+    color: #f8f8f2;
+    margin: 0;
+    padding: 20px;
+  }
+  #editor-container, #output-container {
+    width: 80%;
+    margin: 20px 0;
+    border: 1px solid #6272a4;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .CodeMirror {
+    height: 400px;
+    font-size: 16px;
+  }
+  .button-container {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 20px;
+  }
+  button {
+    margin: 0 10px;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #50fa7b;
+    color: #282a36;
+    border: none;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+  }
+  button:hover {
+    background-color: #5af78e;
+  }
+  #file-input {
+    display: none;
+  }
+  h1 {
+    margin-bottom: 10px;
+  }
+  #output {
+    background-color: #44475a;
+    color: #f8f8f2;
+    padding: 10px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    height: 200px;
+    overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+<h1>Online Python Editor</h1>
+<div class="button-container">
+  <button id="open-btn">Open from Computer</button>
+  <button id="save-btn">Save to Computer</button>
+  <button id="run-btn">Run Code</button>
+  <input type="file" id="file-input" accept=".py">
+</div>
+<div id="editor-container">
+  <textarea id="editor" placeholder="# Start typing your Python code here..."></textarea>
+</div>
+<div id="output-container">
+  <div id="output"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+<script>
+let pyodide;
+
+async function loadPyodideAndPackages() {
+  pyodide = await loadPyodide();
+  await pyodide.loadPackage("micropip");
+  const micropip = pyodide.pyimport("micropip");
+  await micropip.install('pynput');
+  console.log("Pyodide loaded successfully");
+}
+
+loadPyodideAndPackages();
+
+document.addEventListener('DOMContentLoaded', () => {
+  const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
+    mode: 'python',
+    theme: 'dracula',
+    lineNumbers: true,
+    indentUnit: 4,
+    tabSize: 4,
+    indentWithTabs: false,
+    autofocus: true,
+    autoCloseBrackets: true,
+    extraKeys: {
+      "'": (cm) => {
+        cm.replaceSelection("''");
+        cm.execCommand("goCharLeft");
+      },
+      '"': (cm) => {
+        cm.replaceSelection('""');
+        cm.execCommand("goCharLeft");
+      }
+    }
+  });
+
+  const saveBtn = document.getElementById('save-btn');
+  const openBtn = document.getElementById('open-btn');
+  const runBtn = document.getElementById('run-btn');
+  const fileInput = document.getElementById('file-input');
+  const output = document.getElementById('output');
+
+  saveBtn.addEventListener('click', () => {
+    const text = editor.getValue();
+    const blob = new Blob([text], {type: 'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'python_script.py';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  openBtn.addEventListener('click', () => {
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        editor.setValue(e.target.result);
+      };
+      reader.readAsText(file);
+    }
+  });
+
+  runBtn.addEventListener('click', async () => {
+    if (!pyodide) {
+      output.textContent = "Pyodide is still loading. Please wait...";
+      return;
+    }
+    
+    const code = editor.getValue();
+    output.textContent = "Running...";
+    
+    try {
+      // Redirect stdout to capture print statements
+      pyodide.runPython(`
+        import sys
+        import io
+        sys.stdout = io.StringIO()
+      `);
+      
+      // Run the user's code
+      await pyodide.runPythonAsync(code);
+      
+      // Get the captured output
+      const stdout = pyodide.runPython("sys.stdout.getvalue()");
+      output.textContent = stdout || "Code executed successfully with no output.";
+    } catch (err) {
+      output.textContent = `Error: ${err.message}`;
+    }
+  });
+
+  // Example script for a simple task
+  editor.setValue(`
+# Todo List Manager
+
+todos = []
+
+def add_task(task):
+    todos.append(task)
+    print(f"Task '{task}' added to the list.")
+
+def remove_task(task):
+    if task in todos:
+        todos.remove(task)
+        print(f"Task '{task}' removed from the list.")
+    else:
+        print(f"Task '{task}' not found in the list.")
+
+def display_tasks():
+    if todos:
+        print("Your Todo List:")
+        for index, task in enumerate(todos, start=1):
+            print(f"{index}. {task}")
+    else:
+        print("Your todo list is empty.")
+
+# Example usage
+add_task("Buy groceries")
+add_task("Finish homework")
+add_task("Call mom")
+
+display_tasks()
+
+remove_task("Finish homework")
+
+display_tasks()
+
+# This script demonstrates:
+# 1. Function definitions and calls
+# 2. List operations (append, remove)
+# 3. Conditional statements (if-else)
+# 4. Loops (for)
+# 5. String formatting
+# 6. Enumeration
+
+# Click the "Run Code" button to execute this script!
+  `.trim());
+});
+</script>
+</body></html>
